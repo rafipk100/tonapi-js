@@ -2316,6 +2316,8 @@ export interface JettonMetadata {
     social?: string[];
     websites?: string[];
     catalogs?: string[];
+    /** @example "https://claim-api.tonapi.io/jettons/TESTMINT" */
+    customPayloadApiUri?: string;
 }
 
 export interface InscriptionBalances {
@@ -4778,7 +4780,8 @@ const components = {
             description: { type: 'string' },
             social: { type: 'array', items: { type: 'string' } },
             websites: { type: 'array', items: { type: 'string' } },
-            catalogs: { type: 'array', items: { type: 'string' } }
+            catalogs: { type: 'array', items: { type: 'string' } },
+            custom_payload_api_uri: { type: 'string' }
         }
     },
     '#/components/schemas/InscriptionBalances': {
@@ -5207,11 +5210,11 @@ export class Api<SecurityDataType extends unknown> {
         this.http = http;
     }
 
-    blockchain = {
+    utilities = {
         /**
          * @description Status
          *
-         * @tags Blockchain
+         * @tags Utilities
          * @name Status
          * @request GET:/v2/status
          */
@@ -5228,6 +5231,79 @@ export class Api<SecurityDataType extends unknown> {
             });
         },
 
+        /**
+         * @description parse address and display in all formats
+         *
+         * @tags Utilities
+         * @name AddressParse
+         * @request GET:/v2/address/{account_id}/parse
+         */
+        addressParse: async (accountId_Address: Address, params: RequestParams = {}) => {
+            const accountId = accountId_Address.toRawString();
+            const res = await this.http.request<
+                {
+                    /**
+                     * @format address
+                     * @example "0:6e731f2e28b73539a7f85ac47ca104d5840b229351189977bb6151d36b5e3f5e"
+                     */
+                    raw_form: Address;
+                    bounceable: {
+                        b64: string;
+                        b64url: string;
+                    };
+                    non_bounceable: {
+                        b64: string;
+                        b64url: string;
+                    };
+                    given_type: string;
+                    test_only: boolean;
+                },
+                Error
+            >({
+                path: `/v2/address/${accountId}/parse`,
+                method: 'GET',
+                format: 'json',
+                ...params
+            });
+
+            return prepareResponseData<{
+                /**
+                 * @format address
+                 * @example "0:6e731f2e28b73539a7f85ac47ca104d5840b229351189977bb6151d36b5e3f5e"
+                 */
+                raw_form: Address;
+                bounceable: {
+                    b64: string;
+                    b64url: string;
+                };
+                non_bounceable: {
+                    b64: string;
+                    b64url: string;
+                };
+                given_type: string;
+                test_only: boolean;
+            }>(res, {
+                type: 'object',
+                required: ['raw_form', 'bounceable', 'non_bounceable', 'given_type', 'test_only'],
+                properties: {
+                    raw_form: { type: 'string', format: 'address' },
+                    bounceable: {
+                        required: ['b64', 'b64url'],
+                        type: 'object',
+                        properties: { b64: { type: 'string' }, b64url: { type: 'string' } }
+                    },
+                    non_bounceable: {
+                        required: ['b64', 'b64url'],
+                        type: 'object',
+                        properties: { b64: { type: 'string' }, b64url: { type: 'string' } }
+                    },
+                    given_type: { type: 'string' },
+                    test_only: { type: 'boolean' }
+                }
+            });
+        }
+    };
+    blockchain = {
         /**
          * @description Get reduced blockchain blocks data
          *
@@ -5708,275 +5784,7 @@ export class Api<SecurityDataType extends unknown> {
             });
         }
     };
-    emulation = {
-        /**
-         * @description Decode a given message. Only external incoming messages can be decoded currently.
-         *
-         * @tags Emulation
-         * @name DecodeMessage
-         * @request POST:/v2/message/decode
-         */
-        decodeMessage: async (
-            data: {
-                /** @format cell */
-                boc: Cell;
-            },
-            params: RequestParams = {}
-        ) => {
-            const res = await this.http.request<DecodedMessage, Error>({
-                path: `/v2/message/decode`,
-                method: 'POST',
-                body: prepareRequestData(data, {
-                    type: 'object',
-                    required: ['boc'],
-                    properties: { boc: { type: 'string', format: 'cell' } }
-                }),
-                format: 'json',
-                ...params
-            });
-
-            return prepareResponseData<DecodedMessage>(res, {
-                $ref: '#/components/schemas/DecodedMessage'
-            });
-        },
-
-        /**
-         * @description Emulate sending message to blockchain
-         *
-         * @tags Emulation
-         * @name EmulateMessageToEvent
-         * @request POST:/v2/events/emulate
-         */
-        emulateMessageToEvent: async (
-            data: {
-                /** @format cell */
-                boc: Cell;
-            },
-            query?: {
-                ignore_signature_check?: boolean;
-            },
-            params: RequestParams = {}
-        ) => {
-            const res = await this.http.request<Event, Error>({
-                path: `/v2/events/emulate`,
-                method: 'POST',
-                query: query,
-                body: prepareRequestData(data, {
-                    type: 'object',
-                    required: ['boc'],
-                    properties: { boc: { type: 'string', format: 'cell' } }
-                }),
-                format: 'json',
-                ...params
-            });
-
-            return prepareResponseData<Event>(res, { $ref: '#/components/schemas/Event' });
-        },
-
-        /**
-         * @description Emulate sending message to blockchain
-         *
-         * @tags Emulation
-         * @name EmulateMessageToTrace
-         * @request POST:/v2/traces/emulate
-         */
-        emulateMessageToTrace: async (
-            data: {
-                /** @format cell */
-                boc: Cell;
-            },
-            query?: {
-                ignore_signature_check?: boolean;
-            },
-            params: RequestParams = {}
-        ) => {
-            const res = await this.http.request<Trace, Error>({
-                path: `/v2/traces/emulate`,
-                method: 'POST',
-                query: query,
-                body: prepareRequestData(data, {
-                    type: 'object',
-                    required: ['boc'],
-                    properties: { boc: { type: 'string', format: 'cell' } }
-                }),
-                format: 'json',
-                ...params
-            });
-
-            return prepareResponseData<Trace>(res, { $ref: '#/components/schemas/Trace' });
-        },
-
-        /**
-         * @description Emulate sending message to blockchain
-         *
-         * @tags Emulation
-         * @name EmulateMessageToWallet
-         * @request POST:/v2/wallet/emulate
-         */
-        emulateMessageToWallet: async (
-            data: {
-                /** @format cell */
-                boc: Cell;
-                /** additional per account configuration */
-                params?: {
-                    /**
-                     * @format address
-                     * @example "0:97146a46acc2654y27947f14c4a4b14273e954f78bc017790b41208b0043200b"
-                     */
-                    address: Address;
-                    /**
-                     * @format bigint
-                     * @example 10000000000
-                     */
-                    balance?: bigint;
-                }[];
-            },
-            params: RequestParams = {}
-        ) => {
-            const res = await this.http.request<MessageConsequences, Error>({
-                path: `/v2/wallet/emulate`,
-                method: 'POST',
-                body: prepareRequestData(data, {
-                    type: 'object',
-                    required: ['boc'],
-                    properties: {
-                        boc: { type: 'string', format: 'cell' },
-                        params: {
-                            type: 'array',
-                            items: {
-                                type: 'object',
-                                required: ['address'],
-                                properties: {
-                                    address: { type: 'string', format: 'address' },
-                                    balance: {
-                                        type: 'integer',
-                                        format: 'bigint',
-                                        'x-js-format': 'bigint'
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }),
-                format: 'json',
-                ...params
-            });
-
-            return prepareResponseData<MessageConsequences>(res, {
-                $ref: '#/components/schemas/MessageConsequences'
-            });
-        },
-
-        /**
-         * @description Emulate sending message to blockchain
-         *
-         * @tags Emulation
-         * @name EmulateMessageToAccountEvent
-         * @request POST:/v2/accounts/{account_id}/events/emulate
-         */
-        emulateMessageToAccountEvent: async (
-            accountId_Address: Address,
-            data: {
-                /** @format cell */
-                boc: Cell;
-            },
-            query?: {
-                ignore_signature_check?: boolean;
-            },
-            params: RequestParams = {}
-        ) => {
-            const accountId = accountId_Address.toRawString();
-            const res = await this.http.request<AccountEvent, Error>({
-                path: `/v2/accounts/${accountId}/events/emulate`,
-                method: 'POST',
-                query: query,
-                body: prepareRequestData(data, {
-                    type: 'object',
-                    required: ['boc'],
-                    properties: { boc: { type: 'string', format: 'cell' } }
-                }),
-                format: 'json',
-                ...params
-            });
-
-            return prepareResponseData<AccountEvent>(res, {
-                $ref: '#/components/schemas/AccountEvent'
-            });
-        }
-    };
     accounts = {
-        /**
-         * @description parse address and display in all formats
-         *
-         * @tags Accounts
-         * @name AddressParse
-         * @request GET:/v2/address/{account_id}/parse
-         */
-        addressParse: async (accountId_Address: Address, params: RequestParams = {}) => {
-            const accountId = accountId_Address.toRawString();
-            const res = await this.http.request<
-                {
-                    /**
-                     * @format address
-                     * @example "0:6e731f2e28b73539a7f85ac47ca104d5840b229351189977bb6151d36b5e3f5e"
-                     */
-                    raw_form: Address;
-                    bounceable: {
-                        b64: string;
-                        b64url: string;
-                    };
-                    non_bounceable: {
-                        b64: string;
-                        b64url: string;
-                    };
-                    given_type: string;
-                    test_only: boolean;
-                },
-                Error
-            >({
-                path: `/v2/address/${accountId}/parse`,
-                method: 'GET',
-                format: 'json',
-                ...params
-            });
-
-            return prepareResponseData<{
-                /**
-                 * @format address
-                 * @example "0:6e731f2e28b73539a7f85ac47ca104d5840b229351189977bb6151d36b5e3f5e"
-                 */
-                raw_form: Address;
-                bounceable: {
-                    b64: string;
-                    b64url: string;
-                };
-                non_bounceable: {
-                    b64: string;
-                    b64url: string;
-                };
-                given_type: string;
-                test_only: boolean;
-            }>(res, {
-                type: 'object',
-                required: ['raw_form', 'bounceable', 'non_bounceable', 'given_type', 'test_only'],
-                properties: {
-                    raw_form: { type: 'string', format: 'address' },
-                    bounceable: {
-                        required: ['b64', 'b64url'],
-                        type: 'object',
-                        properties: { b64: { type: 'string' }, b64url: { type: 'string' } }
-                    },
-                    non_bounceable: {
-                        required: ['b64', 'b64url'],
-                        type: 'object',
-                        properties: { b64: { type: 'string' }, b64url: { type: 'string' } }
-                    },
-                    given_type: { type: 'string' },
-                    test_only: { type: 'boolean' }
-                }
-            });
-        },
-
         /**
          * @description Get human-friendly information about several accounts without low-level details.
          *
@@ -6105,6 +5913,11 @@ export class Api<SecurityDataType extends unknown> {
                  * @example ["ton","usd","rub"]
                  */
                 currencies?: string[];
+                /**
+                 * comma separated list supported extensions
+                 * @example ["custom_payload"]
+                 */
+                supported_extensions?: string[];
             },
             params: RequestParams = {}
         ) => {
@@ -7479,7 +7292,7 @@ export class Api<SecurityDataType extends unknown> {
     };
     rates = {
         /**
-         * @description Get the token price to the currency
+         * @description Get the token price in the chosen currency for display only. Don’t use this for financial transactions.
          *
          * @tags Rates
          * @name GetRates
@@ -7814,24 +7627,6 @@ export class Api<SecurityDataType extends unknown> {
         },
 
         /**
-         * @description Get wallets by public key
-         *
-         * @tags Wallet
-         * @name GetWalletsByPublicKey
-         * @request GET:/v2/pubkeys/{public_key}/wallets
-         */
-        getWalletsByPublicKey: async (publicKey: string, params: RequestParams = {}) => {
-            const res = await this.http.request<Accounts, Error>({
-                path: `/v2/pubkeys/${publicKey}/wallets`,
-                method: 'GET',
-                format: 'json',
-                ...params
-            });
-
-            return prepareResponseData<Accounts>(res, { $ref: '#/components/schemas/Accounts' });
-        },
-
-        /**
          * @description Get account seqno
          *
          * @tags Wallet
@@ -7848,6 +7643,24 @@ export class Api<SecurityDataType extends unknown> {
             });
 
             return prepareResponseData<Seqno>(res, { $ref: '#/components/schemas/Seqno' });
+        },
+
+        /**
+         * @description Get wallets by public key
+         *
+         * @tags Wallet
+         * @name GetWalletsByPublicKey
+         * @request GET:/v2/pubkeys/{public_key}/wallets
+         */
+        getWalletsByPublicKey: async (publicKey: string, params: RequestParams = {}) => {
+            const res = await this.http.request<Accounts, Error>({
+                path: `/v2/pubkeys/${publicKey}/wallets`,
+                method: 'GET',
+                format: 'json',
+                ...params
+            });
+
+            return prepareResponseData<Accounts>(res, { $ref: '#/components/schemas/Accounts' });
         }
     };
     gasless = {
@@ -7872,7 +7685,7 @@ export class Api<SecurityDataType extends unknown> {
         },
 
         /**
-         * @description Estimates the cost of the given messages and returns a payload to sign.
+         * @description Estimates the cost of the given messages and returns a payload to sign
          *
          * @tags Gasless
          * @name GaslessEstimate
@@ -7921,7 +7734,7 @@ export class Api<SecurityDataType extends unknown> {
         },
 
         /**
-         * No description
+         * @description Submits the signed gasless transaction message to the network
          *
          * @tags Gasless
          * @name GaslessSend
@@ -9084,6 +8897,202 @@ export class Api<SecurityDataType extends unknown> {
             });
 
             return prepareResponseData<Multisig>(res, { $ref: '#/components/schemas/Multisig' });
+        }
+    };
+    emulation = {
+        /**
+         * @description Decode a given message. Only external incoming messages can be decoded currently.
+         *
+         * @tags Emulation
+         * @name DecodeMessage
+         * @request POST:/v2/message/decode
+         */
+        decodeMessage: async (
+            data: {
+                /** @format cell */
+                boc: Cell;
+            },
+            params: RequestParams = {}
+        ) => {
+            const res = await this.http.request<DecodedMessage, Error>({
+                path: `/v2/message/decode`,
+                method: 'POST',
+                body: prepareRequestData(data, {
+                    type: 'object',
+                    required: ['boc'],
+                    properties: { boc: { type: 'string', format: 'cell' } }
+                }),
+                format: 'json',
+                ...params
+            });
+
+            return prepareResponseData<DecodedMessage>(res, {
+                $ref: '#/components/schemas/DecodedMessage'
+            });
+        },
+
+        /**
+         * @description Emulate sending message to blockchain
+         *
+         * @tags Emulation, Events
+         * @name EmulateMessageToEvent
+         * @request POST:/v2/events/emulate
+         */
+        emulateMessageToEvent: async (
+            data: {
+                /** @format cell */
+                boc: Cell;
+            },
+            query?: {
+                ignore_signature_check?: boolean;
+            },
+            params: RequestParams = {}
+        ) => {
+            const res = await this.http.request<Event, Error>({
+                path: `/v2/events/emulate`,
+                method: 'POST',
+                query: query,
+                body: prepareRequestData(data, {
+                    type: 'object',
+                    required: ['boc'],
+                    properties: { boc: { type: 'string', format: 'cell' } }
+                }),
+                format: 'json',
+                ...params
+            });
+
+            return prepareResponseData<Event>(res, { $ref: '#/components/schemas/Event' });
+        },
+
+        /**
+         * @description Emulate sending message to blockchain
+         *
+         * @tags Emulation, Traces
+         * @name EmulateMessageToTrace
+         * @request POST:/v2/traces/emulate
+         */
+        emulateMessageToTrace: async (
+            data: {
+                /** @format cell */
+                boc: Cell;
+            },
+            query?: {
+                ignore_signature_check?: boolean;
+            },
+            params: RequestParams = {}
+        ) => {
+            const res = await this.http.request<Trace, Error>({
+                path: `/v2/traces/emulate`,
+                method: 'POST',
+                query: query,
+                body: prepareRequestData(data, {
+                    type: 'object',
+                    required: ['boc'],
+                    properties: { boc: { type: 'string', format: 'cell' } }
+                }),
+                format: 'json',
+                ...params
+            });
+
+            return prepareResponseData<Trace>(res, { $ref: '#/components/schemas/Trace' });
+        },
+
+        /**
+         * @description Emulate sending message to blockchain
+         *
+         * @tags Emulation, Wallet
+         * @name EmulateMessageToWallet
+         * @request POST:/v2/wallet/emulate
+         */
+        emulateMessageToWallet: async (
+            data: {
+                /** @format cell */
+                boc: Cell;
+                /** additional per account configuration */
+                params?: {
+                    /**
+                     * @format address
+                     * @example "0:97146a46acc2654y27947f14c4a4b14273e954f78bc017790b41208b0043200b"
+                     */
+                    address: Address;
+                    /**
+                     * @format bigint
+                     * @example 10000000000
+                     */
+                    balance?: bigint;
+                }[];
+            },
+            params: RequestParams = {}
+        ) => {
+            const res = await this.http.request<MessageConsequences, Error>({
+                path: `/v2/wallet/emulate`,
+                method: 'POST',
+                body: prepareRequestData(data, {
+                    type: 'object',
+                    required: ['boc'],
+                    properties: {
+                        boc: { type: 'string', format: 'cell' },
+                        params: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                required: ['address'],
+                                properties: {
+                                    address: { type: 'string', format: 'address' },
+                                    balance: {
+                                        type: 'integer',
+                                        format: 'bigint',
+                                        'x-js-format': 'bigint'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }),
+                format: 'json',
+                ...params
+            });
+
+            return prepareResponseData<MessageConsequences>(res, {
+                $ref: '#/components/schemas/MessageConsequences'
+            });
+        },
+
+        /**
+         * @description Emulate sending message to blockchain
+         *
+         * @tags Emulation, Accounts
+         * @name EmulateMessageToAccountEvent
+         * @request POST:/v2/accounts/{account_id}/events/emulate
+         */
+        emulateMessageToAccountEvent: async (
+            accountId_Address: Address,
+            data: {
+                /** @format cell */
+                boc: Cell;
+            },
+            query?: {
+                ignore_signature_check?: boolean;
+            },
+            params: RequestParams = {}
+        ) => {
+            const accountId = accountId_Address.toRawString();
+            const res = await this.http.request<AccountEvent, Error>({
+                path: `/v2/accounts/${accountId}/events/emulate`,
+                method: 'POST',
+                query: query,
+                body: prepareRequestData(data, {
+                    type: 'object',
+                    required: ['boc'],
+                    properties: { boc: { type: 'string', format: 'cell' } }
+                }),
+                format: 'json',
+                ...params
+            });
+
+            return prepareResponseData<AccountEvent>(res, {
+                $ref: '#/components/schemas/AccountEvent'
+            });
         }
     };
 }
