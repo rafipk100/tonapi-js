@@ -2316,6 +2316,8 @@ export interface JettonMetadata {
     social?: string[];
     websites?: string[];
     catalogs?: string[];
+    /** @example "https://claim-api.tonapi.io/jettons/TESTMINT" */
+    customPayloadApiUri?: string;
 }
 
 export interface InscriptionBalances {
@@ -4778,7 +4780,8 @@ const components = {
             description: { type: 'string' },
             social: { type: 'array', items: { type: 'string' } },
             websites: { type: 'array', items: { type: 'string' } },
-            catalogs: { type: 'array', items: { type: 'string' } }
+            catalogs: { type: 'array', items: { type: 'string' } },
+            custom_payload_api_uri: { type: 'string' }
         }
     },
     '#/components/schemas/InscriptionBalances': {
@@ -5931,6 +5934,11 @@ export class Api<SecurityDataType extends unknown> {
                  * @example ["ton","usd","rub"]
                  */
                 currencies?: string[];
+                /**
+                 * comma separated list supported extensions
+                 * @example ["custom_payload"]
+                 */
+                supported_extensions?: string[];
             },
             params: RequestParams = {}
         ) => {
@@ -7378,7 +7386,7 @@ export class Api<SecurityDataType extends unknown> {
     };
     rates = {
         /**
-         * @description Get the token price to the currency
+         * @description Get the token price in the chosen currency for display only. Don’t use this for financial transactions.
          *
          * @tags Rates
          * @name GetRates
@@ -7747,67 +7755,6 @@ export class Api<SecurityDataType extends unknown> {
             });
 
             return prepareResponseData<Accounts>(res, { $ref: '#/components/schemas/Accounts' });
-        },
-
-        /**
-         * @description Emulate sending message to blockchain
-         *
-         * @tags Wallet, Emulation
-         * @name EmulateMessageToWallet
-         * @request POST:/v2/wallet/emulate
-         */
-        emulateMessageToWallet: async (
-            data: {
-                /** @format cell */
-                boc: Cell;
-                /** additional per account configuration */
-                params?: {
-                    /**
-                     * @format address
-                     * @example "0:97146a46acc2654y27947f14c4a4b14273e954f78bc017790b41208b0043200b"
-                     */
-                    address: Address;
-                    /**
-                     * @format bigint
-                     * @example 10000000000
-                     */
-                    balance?: bigint;
-                }[];
-            },
-            params: RequestParams = {}
-        ) => {
-            const res = await this.http.request<MessageConsequences, Error>({
-                path: `/v2/wallet/emulate`,
-                method: 'POST',
-                body: prepareRequestData(data, {
-                    type: 'object',
-                    required: ['boc'],
-                    properties: {
-                        boc: { type: 'string', format: 'cell' },
-                        params: {
-                            type: 'array',
-                            items: {
-                                type: 'object',
-                                required: ['address'],
-                                properties: {
-                                    address: { type: 'string', format: 'address' },
-                                    balance: {
-                                        type: 'integer',
-                                        format: 'bigint',
-                                        'x-js-format': 'bigint'
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }),
-                format: 'json',
-                ...params
-            });
-
-            return prepareResponseData<MessageConsequences>(res, {
-                $ref: '#/components/schemas/MessageConsequences'
-            });
         }
     };
     gasless = {
@@ -9142,6 +9089,67 @@ export class Api<SecurityDataType extends unknown> {
             });
 
             return prepareResponseData<Trace>(res, { $ref: '#/components/schemas/Trace' });
+        },
+
+        /**
+         * @description Emulate sending message to blockchain
+         *
+         * @tags Emulation, Wallet
+         * @name EmulateMessageToWallet
+         * @request POST:/v2/wallet/emulate
+         */
+        emulateMessageToWallet: async (
+            data: {
+                /** @format cell */
+                boc: Cell;
+                /** additional per account configuration */
+                params?: {
+                    /**
+                     * @format address
+                     * @example "0:97146a46acc2654y27947f14c4a4b14273e954f78bc017790b41208b0043200b"
+                     */
+                    address: Address;
+                    /**
+                     * @format bigint
+                     * @example 10000000000
+                     */
+                    balance?: bigint;
+                }[];
+            },
+            params: RequestParams = {}
+        ) => {
+            const res = await this.http.request<MessageConsequences, Error>({
+                path: `/v2/wallet/emulate`,
+                method: 'POST',
+                body: prepareRequestData(data, {
+                    type: 'object',
+                    required: ['boc'],
+                    properties: {
+                        boc: { type: 'string', format: 'cell' },
+                        params: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                required: ['address'],
+                                properties: {
+                                    address: { type: 'string', format: 'address' },
+                                    balance: {
+                                        type: 'integer',
+                                        format: 'bigint',
+                                        'x-js-format': 'bigint'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }),
+                format: 'json',
+                ...params
+            });
+
+            return prepareResponseData<MessageConsequences>(res, {
+                $ref: '#/components/schemas/MessageConsequences'
+            });
         },
 
         /**
